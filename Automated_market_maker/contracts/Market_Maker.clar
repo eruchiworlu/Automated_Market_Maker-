@@ -272,3 +272,59 @@
     )
   )
 )
+
+(define-public (swap (token-in principal) (token-out principal) (amount-in uint) (amount-out-min uint) (deadline uint))
+  (let 
+    (
+      (pair (get-ordered-pair token-in token-out))
+      (token-x (get token-x pair))
+      (token-y (get token-y pair))
+      (is-x-to-y (is-eq token-in token-x))
+      (current-block-height (unwrap! (get-block-info? height (- block-height u1)) (err u111)))
+    )
+    
+    ;; Ensure deadline is not passed
+    (asserts! (<= current-block-height deadline) err-deadline-passed)
+    ;; Ensure tokens are different
+    (asserts! (not (is-eq token-in token-out)) err-same-token)
+    ;; Ensure amount is not zero
+    (asserts! (> amount-in u0) err-zero-amount)
+    
+    (match (get-pool-details token-x token-y)
+      pool
+      (let 
+        (
+          (reserve-x (get reserve-x pool))
+          (reserve-y (get reserve-y pool))
+          (reserve-in (if is-x-to-y reserve-x reserve-y))
+          (reserve-out (if is-x-to-y reserve-y reserve-x))
+          (amount-out (get-amount-out amount-in reserve-in reserve-out))
+        )
+        
+        ;; Ensure output meets minimum
+        (asserts! (>= amount-out amount-out-min) err-slippage-exceeded)
+        ;; Ensure there's sufficient liquidity
+        (asserts! (< amount-out reserve-out) err-insufficient-liquidity)
+        
+        ;; Transfer token-in to contract
+        (unwrap! (transfer-token token-in amount-in tx-sender (as-contract tx-sender)) (err u115))
+        
+        ;; Update reserves
+        (map-set pools 
+          { token-x: token-x, token-y: token-y } 
+          { 
+            reserve-x: (if is-x-to-y (+ reserve-x amount-in) (- reserve-x amount-out)),
+            reserve-y: (if is-x-to-y (- reserve-y amount-out) (+ reserve-y amount-in)),
+            total-shares: (get total-shares pool)
+          }
+        )
+        
+        ;; Transfer token-out to user
+        (as-contract (transfer-token token-out amount-out (as-contract tx-sender) tx-sender))
+        
+        (ok { amount-in: amount-in, amount-out: amount-out })
+      )
+      (err u114) ;; Pool does not exist
+    )
+  )
+)
