@@ -32,3 +32,15 @@
   { token-x: principal, token-y: principal, provider: principal }
   { shares: uint }
 )
+
+;; Read-only functions
+(define-read-only (get-pool-details (token-x principal) (token-y principal))
+  (map-get? pools { token-x: token-x, token-y: token-y })
+)
+
+(define-read-only (get-provider-shares (token-x principal) (token-y principal) (provider principal))
+  (default-to
+    { shares: u0 }
+    (map-get? liquidity-providers { token-x: token-x, token-y: token-y, provider: provider })
+  )
+)
