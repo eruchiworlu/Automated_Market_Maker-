@@ -44,3 +44,25 @@
     (map-get? liquidity-providers { token-x: token-x, token-y: token-y, provider: provider })
   )
 )
+
+
+(define-read-only (get-amount-out (amount-in uint) (reserve-in uint) (reserve-out uint))
+  (let 
+    (
+      (amount-in-with-fee (mul amount-in (- fee-denominator fee-numerator)))
+      (numerator (mul amount-in-with-fee reserve-out))
+      (denominator (+ (* reserve-in fee-denominator) amount-in-with-fee))
+    )
+    (/ numerator denominator)
+  )
+)
+
+(define-read-only (get-amount-in (amount-out uint) (reserve-in uint) (reserve-out uint))
+  (let 
+    (
+      (numerator (mul reserve-in amount-out fee-denominator))
+      (denominator (mul (- reserve-out amount-out) (- fee-denominator fee-numerator)))
+    )
+    (+ (/ numerator denominator) u1)
+  )
+)
