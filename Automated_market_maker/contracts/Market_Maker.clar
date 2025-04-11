@@ -204,3 +204,71 @@
     )
   )
 )
+
+
+(define-public (remove-liquidity (token-a principal) (token-b principal) (shares uint) (amount-a-min uint) (amount-b-min uint) (deadline uint))
+  (let 
+    (
+      (pair (get-ordered-pair token-a token-b))
+      (token-x (get token-x pair))
+      (token-y (get token-y pair))
+      (amount-x-min (if (is-eq token-a token-x) amount-a-min amount-b-min))
+      (amount-y-min (if (is-eq token-a token-x) amount-b-min amount-a-min))
+      (current-block-height (unwrap! (get-block-info? height (- block-height u1)) (err u111)))
+    )
+    
+    ;; Ensure deadline is not passed
+    (asserts! (<= current-block-height deadline) err-deadline-passed)
+    ;; Ensure shares is not zero
+    (asserts! (> shares u0) err-zero-amount)
+    
+    (match (get-pool-details token-x token-y)
+      pool
+      (let 
+        (
+          (reserve-x (get reserve-x pool))
+          (reserve-y (get reserve-y pool))
+          (total-shares (get total-shares pool))
+          (provider-shares (get shares (get-provider-shares token-x token-y tx-sender)))
+        )
+        
+        ;; Ensure provider has enough shares
+        (asserts! (>= provider-shares shares) err-insufficient-balance)
+        
+        ;; Calculate withdrawal amounts
+        (let 
+          (
+            (amount-x (/ (* shares reserve-x) total-shares))
+            (amount-y (/ (* shares reserve-y) total-shares))
+          )
+          
+          ;; Check minimums
+          (asserts! (>= amount-x amount-x-min) err-slippage-exceeded)
+          (asserts! (>= amount-y amount-y-min) err-slippage-exceeded)
+          
+          ;; Update pool and provider shares
+          (map-set pools 
+            { token-x: token-x, token-y: token-y } 
+            { 
+              reserve-x: (- reserve-x amount-x), 
+              reserve-y: (- reserve-y amount-y), 
+              total-shares: (- total-shares shares) 
+            }
+          )
+          
+          (map-set liquidity-providers
+            { token-x: token-x, token-y: token-y, provider: tx-sender }
+            { shares: (- provider-shares shares) }
+          )
+          
+          ;; Transfer tokens from contract to user
+          (as-contract (transfer-token token-x amount-x (as-contract tx-sender) tx-sender))
+          (as-contract (transfer-token token-y amount-y (as-contract tx-sender) tx-sender))
+          
+          (ok { token-x: token-x, token-y: token-y, shares: shares, amount-x: amount-x, amount-y: amount-y })
+        )
+      )
+      (err u114) ;; Pool does not exist
+    )
+  )
+)
