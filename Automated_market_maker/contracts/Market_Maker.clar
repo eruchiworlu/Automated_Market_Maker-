@@ -82,3 +82,42 @@
 (define-private (transfer-token (token principal) (amount uint) (sender principal) (recipient principal))
   (contract-call? token transfer amount sender recipient none)
 )
+
+;; Public functions
+(define-public (create-pool (token-a principal) (token-b principal) (amount-a uint) (amount-b uint))
+  (let 
+    (
+      (pair (get-ordered-pair token-a token-b))
+      (token-x (get token-x pair))
+      (token-y (get token-y pair))
+      (amount-x (if (is-eq token-a token-x) amount-a amount-b))
+      (amount-y (if (is-eq token-a token-x) amount-b amount-a))
+      (initial-shares u1000000000) ;; 1 billion initial LP tokens
+    )
+    
+    ;; Ensure tokens are different
+    (asserts! (not (is-eq token-a token-b)) err-same-token)
+    ;; Ensure amounts are not zero
+    (asserts! (and (> amount-x u0) (> amount-y u0)) err-zero-amount)
+    ;; Ensure pool doesn't exist yet
+    (asserts! (is-none (get-pool-details token-x token-y)) (err u108))
+    
+    ;; Transfer tokens to contract
+    (unwrap! (transfer-token token-x amount-x tx-sender (as-contract tx-sender)) (err u109))
+    (unwrap! (transfer-token token-y amount-y tx-sender (as-contract tx-sender)) (err u110))
+    
+    ;; Create the pool
+    (map-set pools 
+      { token-x: token-x, token-y: token-y } 
+      { reserve-x: amount-x, reserve-y: amount-y, total-shares: initial-shares }
+    )
+    
+    ;; Assign LP tokens to creator
+    (map-set liquidity-providers
+      { token-x: token-x, token-y: token-y, provider: tx-sender }
+      { shares: initial-shares }
+    )
+    
+    (ok { token-x: token-x, token-y: token-y, shares: initial-shares })
+  )
+)
