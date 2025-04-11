@@ -327,4 +327,41 @@
       (err u114) ;; Pool does not exist
     )
   )
+
+
+  ;; Helper functions
+(define-private (sqrti (y uint))
+  (let ((x (pow y u0.5)))
+    (if (is-some x)
+      (to-uint (unwrap-panic x))
+      u0
+    )
+  )
+)
+
+;; Let's add a function to check potential swap output
+(define-read-only (get-swap-output (token-in principal) (token-out principal) (amount-in uint))
+  (let 
+    (
+      (pair (get-ordered-pair token-in token-out))
+      (token-x (get token-x pair))
+      (token-y (get token-y pair))
+      (is-x-to-y (is-eq token-in token-x))
+    )
+    
+    (match (get-pool-details token-x token-y)
+      pool
+      (let 
+        (
+          (reserve-x (get reserve-x pool))
+          (reserve-y (get reserve-y pool))
+          (reserve-in (if is-x-to-y reserve-x reserve-y))
+          (reserve-out (if is-x-to-y reserve-y reserve-x))
+        )
+        (ok (get-amount-out amount-in reserve-in reserve-out))
+      )
+      (err u114) ;; Pool does not exist
+    )
+  )
+)
 )
