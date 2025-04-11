@@ -13,3 +13,22 @@
 (define-constant err-deadline-passed (err u107))
 (define-constant fee-denominator u1000)
 (define-constant fee-numerator u3) ;; 0.3% fee
+
+
+;; Data variables
+(define-data-var total-liquidity uint u0)
+
+;; Data maps
+(define-map pools 
+  { token-x: principal, token-y: principal } 
+  { 
+    reserve-x: uint, 
+    reserve-y: uint,
+    total-shares: uint 
+  }
+)
+
+(define-map liquidity-providers
+  { token-x: principal, token-y: principal, provider: principal }
+  { shares: uint }
+)
