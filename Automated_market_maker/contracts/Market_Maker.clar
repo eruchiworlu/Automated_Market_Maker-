@@ -66,3 +66,19 @@
     (+ (/ numerator denominator) u1)
   )
 )
+
+(define-read-only (quote (amount-a uint) (reserve-a uint) (reserve-b uint))
+  (/ (mul amount-a reserve-b) reserve-a)
+)
+
+;; Private functions
+(define-private (get-ordered-pair (token-a principal) (token-b principal))
+  (if (< token-a token-b)
+    { token-x: token-a, token-y: token-b }
+    { token-x: token-b, token-y: token-a }
+  )
+)
+
+(define-private (transfer-token (token principal) (amount uint) (sender principal) (recipient principal))
+  (contract-call? token transfer amount sender recipient none)
+)
